@@ -1,0 +1,290 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: huawei-webhook
+  namespace: cert-manager
+  labels:
+    app: huawei-webhook
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: huawei-webhook
+  namespace: cert-manager
+  labels:
+    app: huawei-webhook
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - 'secrets'
+    verbs:
+      - 'get'
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: huawei-webhook:flowcontrol-solver
+  labels:
+    app: huawei-webhook
+rules:
+  - apiGroups:
+      - "flowcontrol.apiserver.k8s.io"
+    resources:
+      - 'prioritylevelconfigurations'
+      - 'flowschemas'
+    verbs:
+      - 'list'
+      - 'watch'
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: huawei-webhook:flowcontrol-solver
+  labels:
+    app: huawei-webhook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: huawei-webhook:flowcontrol-solver
+subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: huawei-webhook
+    namespace: cert-manager
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: huawei-webhook
+  namespace: cert-manager
+  labels:
+    app: huawei-webhook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: huawei-webhook
+subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: huawei-webhook
+    namespace: cert-manager
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: huawei-webhook:webhook-authentication-reader
+  namespace: kube-system
+  labels:
+    app: huawei-webhook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: huawei-webhook
+    namespace: cert-manager
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: huawei-webhook:auth-delegator
+  namespace: cert-manager
+  labels:
+    app: huawei-webhook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: huawei-webhook
+    namespace: cert-manager
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: huawei-webhook:domain-solver
+  labels:
+    app: huawei-webhook
+rules:
+  - apiGroups:
+      - acme.asterip.net
+    resources:
+      - '*'
+    verbs:
+      - 'create'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: huawei-webhook:domain-solver
+  labels:
+    app: huawei-webhook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: huawei-webhook:domain-solver
+subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: cert-manager
+    namespace: cert-manager
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: huawei-webhook
+  namespace: cert-manager
+  labels:
+    app: huawei-webhook
+spec:
+  type: ClusterIP
+  ports:
+    - port: 443
+      targetPort: https
+      protocol: TCP
+      name: https
+  selector:
+    app: huawei-webhook
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: huawei-webhook
+  namespace: cert-manager
+  labels:
+    app: huawei-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: huawei-webhook
+  template:
+    metadata:
+      labels:
+        app: huawei-webhook
+    spec:
+      serviceAccountName: huawei-webhook
+      containers:
+        - name: huawei-webhook
+          image: ddddn/cert-manager-webhook-huawei:v0.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - --tls-cert-file=/tls/tls.crt
+            - --tls-private-key-file=/tls/tls.key
+          env:
+            - name: GROUP_NAME
+              value: "acme.asterip.net"
+          ports:
+            - name: https
+              containerPort: 443
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              scheme: HTTPS
+              path: /healthz
+              port: https
+          readinessProbe:
+            httpGet:
+              scheme: HTTPS
+              path: /healthz
+              port: https
+          volumeMounts:
+            - name: certs
+              mountPath: /tls
+              readOnly: true
+          resources:
+            {}
+
+      volumes:
+        - name: certs
+          secret:
+            secretName: huawei-webhook-webhook-tls
+
+---
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1alpha1.acme.asterip.net
+  labels:
+    app: huawei-webhook
+  annotations:
+    cert-manager.io/inject-ca-from: "cert-manager/huawei-webhook-webhook-tls"
+spec:
+  group: acme.asterip.net
+  groupPriorityMinimum: 1000
+  versionPriority: 15
+  service:
+    name: huawei-webhook
+    namespace: cert-manager
+  version: v1alpha1
+
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: huawei-webhook-selfsign
+  namespace: cert-manager
+  labels:
+    app: huawei-webhook
+spec:
+  selfSigned: {}
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: huawei-webhook-ca
+  namespace: cert-manager
+  labels:
+    app: huawei-webhook
+spec:
+  secretName: huawei-webhook-ca
+  duration: 43800h # 5y
+  issuerRef:
+    name: huawei-webhook-selfsign
+  commonName: "ca.huawei-webhook.cert-manager"
+  isCA: true
+
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: huawei-webhook-ca
+  namespace: cert-manager
+  labels:
+    app: huawei-webhook
+spec:
+  ca:
+    secretName: huawei-webhook-ca
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: huawei-webhook-webhook-tls
+  namespace: cert-manager
+  labels:
+    app: huawei-webhook
+spec:
+  secretName: huawei-webhook-webhook-tls
+  duration: 8760h # 1y
+  issuerRef:
+    name: huawei-webhook-ca
+  dnsNames:
+    - huawei-webhook
+    - huawei-webhook.cert-manager
+    - huawei-webhook.cert-manager.svc
+    - huawei-webhook.cert-manager.svc.cluster.local
