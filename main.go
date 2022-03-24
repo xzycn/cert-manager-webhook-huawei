@@ -54,7 +54,7 @@ type huaweiDNSProviderSolver struct {
 
 type huaweiDNSProviderConfig struct {
 	Region             string                     `json:"region"`
-	ZoneID             string                     `json:"zone_id"`
+	ZoneID             string                     `json:"zoneID"`
 	AccessKeySecretRef cmmetav1.SecretKeySelector `json:"accessKeySecretRef"`
 	SecretKeySecretRef cmmetav1.SecretKeySelector `json:"secretKeySecretRef"`
 }
@@ -119,7 +119,7 @@ func (h *huaweiDNSProviderSolver) Initialize(kubeClientConfig *rest.Config, stop
 	}
 
 	h.client = cl
-
+	h.dnsClients = make(map[string]*dns.DnsClient)
 	return nil
 }
 
