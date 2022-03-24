@@ -141,7 +141,7 @@ func (h *huaweiDNSProviderSolver) getDNSClient(cfg *huaweiDNSProviderConfig, ch 
 	if !ok {
 		ak, sk, err := h.getCredential(cfg, ch.ResourceNamespace)
 		if err != nil {
-			return nil, nil
+			return nil, err
 		}
 		auth := basic.NewCredentialsBuilder().WithAk(ak).WithSk(sk).Build()
 		dnsClient := dns.NewDnsClient(
