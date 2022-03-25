@@ -1,1 +1,12 @@
-{}
+{
+  "region": "cn-south-1",
+  "zoneID": "***",
+  "accessKeySecretRef":{
+    "name": "huawei-secret",
+    "key": "access-key"
+  },
+  "secretKeySecretRef": {
+    "name": "huawei-secret",
+    "key": "access-key"
+  }
+}

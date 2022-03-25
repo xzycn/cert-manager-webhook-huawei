@@ -1,69 +1,105 @@
 package huawei
 
 import (
-	"fmt"
+	"github.com/huaweicloud/huaweicloud-sdk-go-v3/core/auth/basic"
+	dns "github.com/huaweicloud/huaweicloud-sdk-go-v3/services/dns/v2"
+	hwregion "github.com/huaweicloud/huaweicloud-sdk-go-v3/services/dns/v2/region"
+	"github.com/pkg/errors"
 
-	"github.com/miekg/dns"
+	"github.com/huaweicloud/huaweicloud-sdk-go-v3/services/dns/v2/model"
+	"github.com/jetstack/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
+	"github.com/jetstack/cert-manager/pkg/issuer/acme/dns/util"
+	"strings"
 )
 
-func (e *exampleSolver) handleDNSRequest(w dns.ResponseWriter, req *dns.Msg) {
-	msg := new(dns.Msg)
-	msg.SetReply(req)
-	switch req.Opcode {
-	case dns.OpcodeQuery:
-		for _, q := range msg.Question {
-			if err := e.addDNSAnswer(q, msg, req); err != nil {
-				msg.SetRcode(req, dns.RcodeServerFailure)
-				break
+const RecordTypeTXT = "TXT"
+
+type Client struct {
+	dc *dns.DnsClient
+}
+
+func NewClient(ak, sk, region string) *Client {
+	auth := basic.NewCredentialsBuilder().WithAk(ak).WithSk(sk).Build()
+	dnsClient := dns.NewDnsClient(
+		dns.DnsClientBuilder().
+			WithRegion(hwregion.ValueOf(region)).
+			WithCredential(auth).
+			Build())
+
+	return &Client{dnsClient}
+}
+
+func (c *Client) getTXTRecordsRequest(ch *v1alpha1.ChallengeRequest) *model.ListRecordSetsRequest {
+	request := &model.ListRecordSetsRequest{}
+	recordType := RecordTypeTXT
+	request.Type = &recordType
+	nameRequest := extractRecordSetName(ch.ResolvedFQDN, ch.ResolvedZone)
+	request.Name = &nameRequest
+	recordsRequest := ch.Key
+	request.Records = &recordsRequest
+
+	return request
+}
+
+func (c *Client) GetTXTRecord(ch *v1alpha1.ChallengeRequest) (*model.ListRecordSetsWithTags, error) {
+	request := c.getTXTRecordsRequest(ch)
+	response, err := c.dc.ListRecordSets(request)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, record := range *response.Recordsets {
+		for _, value := range *record.Records {
+			if value == ch.Key {
+				return &record, nil
 			}
 		}
 	}
-	w.WriteMsg(msg)
+
+	return nil, errors.Errorf("cannot find TXT record for %v", request.Name)
+
 }
 
-func (e *exampleSolver) addDNSAnswer(q dns.Question, msg *dns.Msg, req *dns.Msg) error {
-	switch q.Qtype {
-	// Always return loopback for any A query
-	case dns.TypeA:
-		rr, err := dns.NewRR(fmt.Sprintf("%s 5 IN A 127.0.0.1", q.Name))
-		if err != nil {
-			return err
-		}
-		msg.Answer = append(msg.Answer, rr)
-		return nil
+func newTXTRecordRequest(ch *v1alpha1.ChallengeRequest, zoneID string) *model.CreateRecordSetRequest {
+	name := extractRecordSetName(ch.ResolvedFQDN, ch.ResolvedZone)
 
-	// TXT records are the only important record for ACME dns-01 challenges
-	case dns.TypeTXT:
-		e.RLock()
-		record, found := e.txtRecords[q.Name]
-		e.RUnlock()
-		if !found {
-			msg.SetRcode(req, dns.RcodeNameError)
-			return nil
-		}
-		rr, err := dns.NewRR(fmt.Sprintf("%s 5 IN TXT %s", q.Name, record))
-		if err != nil {
-			return err
-		}
-		msg.Answer = append(msg.Answer, rr)
-		return nil
+	request := &model.CreateRecordSetRequest{}
+	request.ZoneId = zoneID
 
-	// NS and SOA are for authoritative lookups, return obviously invalid data
-	case dns.TypeNS:
-		rr, err := dns.NewRR(fmt.Sprintf("%s 5 IN NS ns.huawei-acme-webook.invalid.", q.Name))
-		if err != nil {
-			return err
-		}
-		msg.Answer = append(msg.Answer, rr)
-		return nil
-	case dns.TypeSOA:
-		rr, err := dns.NewRR(fmt.Sprintf("%s 5 IN SOA %s 20 5 5 5 5", "ns.huawei-acme-webook.invalid.", "ns.huawei-acme-webook.invalid."))
-		if err != nil {
-			return err
-		}
-		msg.Answer = append(msg.Answer, rr)
-		return nil
-	default:
-		return fmt.Errorf("unimplemented record type %v", q.Qtype)
+	request.Body = &model.CreateRecordSetReq{
+		Records: []string{
+			ch.Key,
+		},
+		Type: RecordTypeTXT,
+		Name: name,
 	}
+	return request
+}
+
+func (c *Client) CreateTXTRecord(ch *v1alpha1.ChallengeRequest, zoneID string) error {
+	_, err := c.dc.CreateRecordSet(newTXTRecordRequest(ch, zoneID))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) DeleteTXTRecord(record *model.ListRecordSetsWithTags) error {
+	request := &model.DeleteRecordSetRequest{}
+	request.ZoneId = *record.ZoneId
+	request.RecordsetId = *record.Id
+	_, err := c.dc.DeleteRecordSet(request)
+	if err != nil {
+		return errors.Errorf("failed to delete TXT record: %v", err)
+	}
+	return nil
+}
+
+func extractRecordSetName(fqdn, zone string) string {
+	name := util.UnFqdn(fqdn)
+	if idx := strings.Index(name, "."+zone); idx != -1 {
+		return name[:idx]
+	}
+
+	return name
 }
