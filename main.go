@@ -54,7 +54,7 @@ func (h *huaweiDNSProviderSolver) Name() string {
 }
 
 func (h *huaweiDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
-	h.Lock()
+	klog.Infof("start to present TXT record: %v %v", ch.ResolvedFQDN, ch.ResolvedZone)
 	cfg, err := loadConfig(ch.Config)
 	if err != nil {
 		return err
@@ -72,12 +72,13 @@ func (h *huaweiDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 		klog.Errorf("failed to add TXT record: %v", err)
 		return err
 	}
+	klog.Infof("complete presenting TXT record %v %v", ch.ResolvedFQDN, ch.ResolvedZone)
 
-	h.Unlock()
 	return nil
 }
 
 func (h *huaweiDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
+	klog.Infof("start to clean TXT record: %v %v", ch.ResolvedFQDN, ch.ResolvedZone)
 	cfg, err := loadConfig(ch.Config)
 	if err != nil {
 		return err
@@ -99,6 +100,8 @@ func (h *huaweiDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 	if err != nil {
 		return err
 	}
+
+	klog.Infof("complete cleaning relevant TXT record %v %v", ch.ResolvedFQDN, ch.ResolvedZone)
 
 	return nil
 }
