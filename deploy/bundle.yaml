@@ -1,105 +1,47 @@
 ---
+# Source: cert-manager-webhook-huawei/templates/rbac.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: huawei-webhook
-  namespace: cert-manager
+  namespace: "cert-manager"
   labels:
-    app: huawei-webhook
-
+    app: cert-manager-webhook-huawei
+    chart: cert-manager-webhook-huawei-0.1.0
+    release: cert-manager-webhook-huawei
+    heritage: Helm
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: huawei-webhook
-  namespace: cert-manager
-  labels:
-    app: huawei-webhook
-rules:
-  - apiGroups:
-      - ''
-    resources:
-      - 'secrets'
-    verbs:
-      - 'get'
-
----
+# Source: cert-manager-webhook-huawei/templates/rbac.yaml
+# Grant cert-manager permission to validate using our apiserver
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: huawei-webhook:flowcontrol-solver
+  name: huawei-webhook:domain-solver
   labels:
-    app: huawei-webhook
+    app: cert-manager-webhook-huawei
+    chart: cert-manager-webhook-huawei-0.1.0
+    release: cert-manager-webhook-huawei
+    heritage: Helm
 rules:
   - apiGroups:
-      - "flowcontrol.apiserver.k8s.io"
+      - acme.asterip.net
     resources:
-      - 'prioritylevelconfigurations'
-      - 'flowschemas'
+      - '*'
     verbs:
-      - 'list'
-      - 'watch'
-
+      - 'create'
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: huawei-webhook:flowcontrol-solver
-  labels:
-    app: huawei-webhook
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: huawei-webhook:flowcontrol-solver
-subjects:
-  - apiGroup: ""
-    kind: ServiceAccount
-    name: huawei-webhook
-    namespace: cert-manager
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: huawei-webhook
-  namespace: cert-manager
-  labels:
-    app: huawei-webhook
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: huawei-webhook
-subjects:
-  - apiGroup: ""
-    kind: ServiceAccount
-    name: huawei-webhook
-    namespace: cert-manager
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: huawei-webhook:webhook-authentication-reader
-  namespace: kube-system
-  labels:
-    app: huawei-webhook
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: extension-apiserver-authentication-reader
-subjects:
-  - apiGroup: ""
-    kind: ServiceAccount
-    name: huawei-webhook
-    namespace: cert-manager
----
+# Source: cert-manager-webhook-huawei/templates/rbac.yaml
+# apiserver gets the auth-delegator role to delegate auth decisions to
+# the core apiserver
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: huawei-webhook:auth-delegator
-  namespace: cert-manager
   labels:
-    app: huawei-webhook
+    app: cert-manager-webhook-huawei
+    chart: cert-manager-webhook-huawei-0.1.0
+    release: cert-manager-webhook-huawei
+    heritage: Helm
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -110,26 +52,16 @@ subjects:
     name: huawei-webhook
     namespace: cert-manager
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: huawei-webhook:domain-solver
-  labels:
-    app: huawei-webhook
-rules:
-  - apiGroups:
-      - acme.asterip.net
-    resources:
-      - '*'
-    verbs:
-      - 'create'
----
+# Source: cert-manager-webhook-huawei/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: huawei-webhook:domain-solver
   labels:
-    app: huawei-webhook
+    app: cert-manager-webhook-huawei
+    chart: cert-manager-webhook-huawei-0.1.0
+    release: cert-manager-webhook-huawei
+    heritage: Helm
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -139,15 +71,42 @@ subjects:
     kind: ServiceAccount
     name: cert-manager
     namespace: cert-manager
-
 ---
+# Source: cert-manager-webhook-huawei/templates/rbac.yaml
+# Grant the webhook permission to read the ConfigMap containing the Kubernetes
+# apiserver's requestheader-ca-certificate.
+# This ConfigMap is automatically created by the Kubernetes apiserver.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: huawei-webhook:webhook-authentication-reader
+  namespace: kube-system
+  labels:
+    app: cert-manager-webhook-huawei
+    chart: cert-manager-webhook-huawei-0.1.0
+    release: cert-manager-webhook-huawei
+    heritage: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: huawei-webhook
+    namespace: cert-manager
+---
+# Source: cert-manager-webhook-huawei/templates/service.yaml
 apiVersion: v1
 kind: Service
 metadata:
   name: huawei-webhook
-  namespace: cert-manager
+  namespace: "cert-manager"
   labels:
-    app: huawei-webhook
+    app: cert-manager-webhook-huawei
+    chart: cert-manager-webhook-huawei-0.1.0
+    release: cert-manager-webhook-huawei
+    heritage: Helm
 spec:
   type: ClusterIP
   ports:
@@ -156,30 +115,36 @@ spec:
       protocol: TCP
       name: https
   selector:
-    app: huawei-webhook
-
+    app: cert-manager-webhook-huawei
+    release: cert-manager-webhook-huawei
 ---
+# Source: cert-manager-webhook-huawei/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: huawei-webhook
-  namespace: cert-manager
+  namespace: "cert-manager"
   labels:
-    app: huawei-webhook
+    app: cert-manager-webhook-huawei
+    chart: cert-manager-webhook-huawei-0.1.0
+    release: cert-manager-webhook-huawei
+    heritage: Helm
 spec:
-  replicas: 1
+  replicas: 
   selector:
     matchLabels:
-      app: huawei-webhook
+      app: cert-manager-webhook-huawei
+      release: cert-manager-webhook-huawei
   template:
     metadata:
       labels:
-        app: huawei-webhook
+        app: cert-manager-webhook-huawei
+        release: cert-manager-webhook-huawei
     spec:
       serviceAccountName: huawei-webhook
       containers:
-        - name: huawei-webhook
-          image: ddddn/cert-manager-webhook-huawei:v0.1
+        - name: cert-manager-webhook-huawei
+          image: "ddddn/cert-manager-webhook-huawei:v0.2"
           imagePullPolicy: IfNotPresent
           args:
             - --tls-cert-file=/tls/tls.crt
@@ -207,19 +172,21 @@ spec:
               readOnly: true
           resources:
             {}
-
       volumes:
         - name: certs
           secret:
             secretName: huawei-webhook-webhook-tls
-
 ---
+# Source: cert-manager-webhook-huawei/templates/apiservice.yaml
 apiVersion: apiregistration.k8s.io/v1
 kind: APIService
 metadata:
   name: v1alpha1.acme.asterip.net
   labels:
-    app: huawei-webhook
+    app: cert-manager-webhook-huawei
+    chart: cert-manager-webhook-huawei-0.1.0
+    release: cert-manager-webhook-huawei
+    heritage: Helm
   annotations:
     cert-manager.io/inject-ca-from: "cert-manager/huawei-webhook-webhook-tls"
 spec:
@@ -230,61 +197,77 @@ spec:
     name: huawei-webhook
     namespace: cert-manager
   version: v1alpha1
-
 ---
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: huawei-webhook-selfsign
-  namespace: cert-manager
-  labels:
-    app: huawei-webhook
-spec:
-  selfSigned: {}
-
----
+# Source: cert-manager-webhook-huawei/templates/pki.yaml
+# Generate a CA Certificate used to sign certificates for the webhook
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: huawei-webhook-ca
-  namespace: cert-manager
+  namespace: "cert-manager"
   labels:
-    app: huawei-webhook
+    app: cert-manager-webhook-huawei
+    chart: cert-manager-webhook-huawei-0.1.0
+    release: cert-manager-webhook-huawei
+    heritage: Helm
 spec:
   secretName: huawei-webhook-ca
   duration: 43800h # 5y
   issuerRef:
     name: huawei-webhook-selfsign
-  commonName: "ca.huawei-webhook.cert-manager"
+  commonName: "ca.cert-manager-webhook-huawei.cert-manager"
   isCA: true
-
 ---
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: huawei-webhook-ca
-  namespace: cert-manager
-  labels:
-    app: huawei-webhook
-spec:
-  ca:
-    secretName: huawei-webhook-ca
-
----
+# Source: cert-manager-webhook-huawei/templates/pki.yaml
+# Finally, generate a serving certificate for the webhook to use
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: huawei-webhook-webhook-tls
-  namespace: cert-manager
+  namespace: "cert-manager"
   labels:
-    app: huawei-webhook
+    app: cert-manager-webhook-huawei
+    chart: cert-manager-webhook-huawei-0.1.0
+    release: cert-manager-webhook-huawei
+    heritage: Helm
 spec:
   secretName: huawei-webhook-webhook-tls
   duration: 8760h # 1y
   issuerRef:
     name: huawei-webhook-ca
   dnsNames:
-    - huawei-webhook
-    - huawei-webhook.cert-manager
-    - huawei-webhook.cert-manager.svc
-    - huawei-webhook.cert-manager.svc.cluster.local
+  - huawei-webhook
+  - huawei-webhook.cert-manager
+  - huawei-webhook.cert-manager.svc
+---
+# Source: cert-manager-webhook-huawei/templates/pki.yaml
+# Create a selfsigned Issuer, in order to create a root CA certificate for
+# signing webhook serving certificates
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: huawei-webhook-selfsign
+  namespace: "cert-manager"
+  labels:
+    app: cert-manager-webhook-huawei
+    chart: cert-manager-webhook-huawei-0.1.0
+    release: cert-manager-webhook-huawei
+    heritage: Helm
+spec:
+  selfSigned: {}
+---
+# Source: cert-manager-webhook-huawei/templates/pki.yaml
+# Create an Issuer that uses the above generated CA certificate to issue certs
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: huawei-webhook-ca
+  namespace: "cert-manager"
+  labels:
+    app: cert-manager-webhook-huawei
+    chart: cert-manager-webhook-huawei-0.1.0
+    release: cert-manager-webhook-huawei
+    heritage: Helm
+spec:
+  ca:
+    secretName: huawei-webhook-ca

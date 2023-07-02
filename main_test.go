@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/jetstack/cert-manager/pkg/acme/webhook"
-	"github.com/jetstack/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
-	"github.com/jetstack/cert-manager/test/acme/dns"
+	"github.com/cert-manager/cert-manager/pkg/acme/webhook"
+	"github.com/cert-manager/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
+	"github.com/cert-manager/cert-manager/test/acme"
 	"io/ioutil"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	restclient "k8s.io/client-go/rest"
@@ -53,7 +53,7 @@ func getChallengeRequest() *v1alpha1.ChallengeRequest {
 		ResolvedFQDN: "_acme-challenge.asterip.net.",
 		ResolvedZone: "asterip.net.",
 		Config:       &apiextensionsv1.JSON{Raw: configJSONByte},
-		Key:          fmt.Sprintf("%q", "test"),
+		Key:          "test",
 	}
 	return ch
 }

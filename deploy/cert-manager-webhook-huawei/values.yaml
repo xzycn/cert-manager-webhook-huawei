@@ -12,10 +12,9 @@ certManager:
   namespace: cert-manager
   serviceAccountName: cert-manager
 
-replicaCount: 1
 image:
-  repository: mycompany/webhook-image
-  tag: latest
+  repository: ddddn/cert-manager-webhook-huawei
+  tag: v0.2
   pullPolicy: IfNotPresent
 
 nameOverride: ""

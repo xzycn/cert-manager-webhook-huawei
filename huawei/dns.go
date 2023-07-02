@@ -6,9 +6,9 @@ import (
 	hwregion "github.com/huaweicloud/huaweicloud-sdk-go-v3/services/dns/v2/region"
 	"github.com/pkg/errors"
 
+	"github.com/cert-manager/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
+	"github.com/cert-manager/cert-manager/pkg/issuer/acme/dns/util"
 	"github.com/huaweicloud/huaweicloud-sdk-go-v3/services/dns/v2/model"
-	"github.com/jetstack/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
-	"github.com/jetstack/cert-manager/pkg/issuer/acme/dns/util"
 	"strings"
 )
 
@@ -66,7 +66,7 @@ func newTXTRecordRequest(ch *v1alpha1.ChallengeRequest, zoneID string) *model.Cr
 	request := &model.CreateRecordSetRequest{}
 	request.ZoneId = zoneID
 
-	request.Body = &model.CreateRecordSetReq{
+	request.Body = &model.CreateRecordSetRequestBody{
 		Records: []string{
 			ch.Key,
 		},

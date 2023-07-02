@@ -32,7 +32,7 @@ spec:
   duration: 43800h # 5y
   issuerRef:
     name: {{ include "cert-manager-webhook-huawei.selfSignedIssuer" . }}
-  commonName: "ca.huawei-webhook.cert-manager"
+  commonName: "ca.cert-manager-webhook-huawei.cert-manager"
   isCA: true
 
 ---

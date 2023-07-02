@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/jetstack/cert-manager/pkg/acme/webhook"
+	"github.com/cert-manager/cert-manager/pkg/acme/webhook"
 	"github.com/pkg/errors"
 	"github.com/xzycn/cert-manager-webhook-huawei/huawei"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,9 +16,9 @@ import (
 	extapi "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/client-go/rest"
 
-	"github.com/jetstack/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
-	"github.com/jetstack/cert-manager/pkg/acme/webhook/cmd"
-	cmmetav1 "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
+	"github.com/cert-manager/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
+	"github.com/cert-manager/cert-manager/pkg/acme/webhook/cmd"
+	cmmetav1 "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 )
 
 var GroupName = os.Getenv("GROUP_NAME")
@@ -54,7 +54,8 @@ func (h *huaweiDNSProviderSolver) Name() string {
 }
 
 func (h *huaweiDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
-	klog.Infof("start to present TXT record: %v %v", ch.ResolvedFQDN, ch.ResolvedZone)
+	ch.Key = fmt.Sprintf("%q", ch.Key)
+	klog.Infof("start to present TXT record(value: %s): %v %v", ch.ResolvedFQDN, ch.ResolvedZone, ch.Key)
 	cfg, err := loadConfig(ch.Config)
 	if err != nil {
 		return err
@@ -64,6 +65,7 @@ func (h *huaweiDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 
 	dnsClient, err := h.getDNSClient(cfg, ch)
 	if err != nil {
+		klog.Errorf("failed to get dns client: %v", err)
 		return err
 	}
 
@@ -78,7 +80,8 @@ func (h *huaweiDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 }
 
 func (h *huaweiDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
-	klog.Infof("start to clean TXT record: %v %v", ch.ResolvedFQDN, ch.ResolvedZone)
+	ch.Key = fmt.Sprintf("%q", ch.Key)
+	klog.Infof("start to clean TXT record(value: %s): %v %v", ch.ResolvedFQDN, ch.ResolvedZone, ch.Key)
 	cfg, err := loadConfig(ch.Config)
 	if err != nil {
 		return err
@@ -88,16 +91,19 @@ func (h *huaweiDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 
 	dnsClient, err := h.getDNSClient(cfg, ch)
 	if err != nil {
+		klog.Errorf("failed to get dns client: %v", err)
 		return err
 	}
 
 	record, err := dnsClient.GetTXTRecord(ch)
 	if err != nil {
+		klog.Errorf("failed to get TXT record: %v", err)
 		return err
 	}
 
 	err = dnsClient.DeleteTXTRecord(record)
 	if err != nil {
+		klog.Errorf("failed to delete TXT record: %v", err)
 		return err
 	}
 
